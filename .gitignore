@@ -25,3 +25,10 @@ web/log
 uploads_test/
 .phpspec/*.tpl
 composer.lock
+# IDEs
+nbproject
+.buildpath
+.metadata
+.project
+.settings/
+.idea/
