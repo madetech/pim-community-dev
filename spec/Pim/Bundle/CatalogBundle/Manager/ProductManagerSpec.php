@@ -20,7 +20,7 @@ use Pim\Bundle\CatalogBundle\Model\ProductInterface;
 use Pim\Bundle\CatalogBundle\Model\ProductValueInterface;
 use Pim\Bundle\CatalogBundle\Model\AvailableAttributes;
 use Pim\Bundle\CatalogBundle\Persistence\ProductPersister;
-use Pim\Bundle\CatalogBundle\CatalogEvents;
+use Pim\Bundle\CatalogBundle\Event\ProductEvents;
 
 class ProductManagerSpec extends ObjectBehavior
 {
@@ -132,10 +132,18 @@ class ProductManagerSpec extends ObjectBehavior
         $objectManager,
         ProductInterface $product
     ) {
-        $eventDispatcher->dispatch(
-            CatalogEvents::PRE_REMOVE_PRODUCT,
-            Argument::type('Symfony\Component\EventDispatcher\GenericEvent')
-        )->shouldBeCalled();
+        $eventDispatcher
+            ->dispatch(
+                ProductEvents::PRE_REMOVE,
+                Argument::type('Symfony\Component\EventDispatcher\GenericEvent')
+            )
+            ->shouldBeCalled();
+        $eventDispatcher
+            ->dispatch(
+                ProductEvents::POST_REMOVE,
+                Argument::type('Symfony\Component\EventDispatcher\GenericEvent')
+            )
+            ->shouldBeCalled();
 
         $objectManager->remove($product)->shouldBeCalled();
         $objectManager->flush()->shouldBeCalled();
@@ -148,10 +156,18 @@ class ProductManagerSpec extends ObjectBehavior
         $objectManager,
         ProductInterface $product
     ) {
-        $eventDispatcher->dispatch(
-            CatalogEvents::PRE_REMOVE_PRODUCT,
-            Argument::type('Symfony\Component\EventDispatcher\GenericEvent')
-        )->shouldBeCalled();
+        $eventDispatcher
+            ->dispatch(
+                ProductEvents::PRE_REMOVE,
+                Argument::type('Symfony\Component\EventDispatcher\GenericEvent')
+            )
+            ->shouldBeCalled();
+        $eventDispatcher
+            ->dispatch(
+                ProductEvents::POST_REMOVE,
+                Argument::type('Symfony\Component\EventDispatcher\GenericEvent')
+            )
+            ->shouldBeCalled();
 
         $objectManager->remove($product)->shouldBeCalled();
         $objectManager->flush()->shouldNotBeCalled();
@@ -169,7 +185,11 @@ class ProductManagerSpec extends ObjectBehavior
         $productRepository->findByIds([1, 2])->willReturn([$product1, $product2]);
 
         $eventDispatcher->dispatch(
-            CatalogEvents::PRE_REMOVE_PRODUCT,
+            ProductEvents::PRE_REMOVE,
+            Argument::type('Symfony\Component\EventDispatcher\GenericEvent')
+        )->shouldBeCalledTimes(2);
+        $eventDispatcher->dispatch(
+            ProductEvents::POST_REMOVE,
             Argument::type('Symfony\Component\EventDispatcher\GenericEvent')
         )->shouldBeCalledTimes(2);
 

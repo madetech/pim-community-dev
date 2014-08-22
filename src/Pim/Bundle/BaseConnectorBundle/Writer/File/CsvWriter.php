@@ -3,8 +3,7 @@
 namespace Pim\Bundle\BaseConnectorBundle\Writer\File;
 
 use Symfony\Component\Validator\Constraints as Assert;
-use Pim\Bundle\CatalogBundle\Manager\MediaManager;
-use Pim\Bundle\CatalogBundle\Model\AbstractMedia;
+use Akeneo\Bundle\BatchBundle\Job\RuntimeErrorException;
 
 /**
  * Write data into a csv file on the filesystem
@@ -35,11 +34,6 @@ class CsvWriter extends FileWriter implements ArchivableWriterInterface
     protected $withHeader = true;
 
     /**
-     * @param MediaManager $mediaManager
-     */
-    protected $mediaManager;
-
-    /**
      * @var array
      */
     protected $writtenFiles = array();
@@ -48,14 +42,6 @@ class CsvWriter extends FileWriter implements ArchivableWriterInterface
      * @var array
      */
     protected $items = [];
-
-    /**
-     * @param MediaManager $mediaManager
-     */
-    public function __construct(MediaManager $mediaManager)
-    {
-        $this->mediaManager = $mediaManager;
-    }
 
     /**
      * Set the csv delimiter character
@@ -136,15 +122,17 @@ class CsvWriter extends FileWriter implements ArchivableWriterInterface
         $fullItems = $this->mergeKeys($uniqueKeys);
         $csvFile = fopen($this->getPath(), 'w');
 
-        if (true == $this->isWithHeader()) {
-            fputcsv($csvFile, $uniqueKeys, $this->delimiter);
-        } else {
-            fputcsv($csvFile, [], $this->delimiter);
+        $header = $this->isWithHeader() ? $uniqueKeys : [];
+        if (false === fputcsv($csvFile, $header, $this->delimiter)) {
+            throw new RuntimeErrorException('Failed to write to file %path%', ['%path%' => $this->getPath()]);
         }
 
         foreach ($fullItems as $item) {
-            fputcsv($csvFile, $item, $this->delimiter, $this->enclosure);
-            $this->stepExecution->incrementSummaryInfo('write');
+            if (false === fputcsv($csvFile, $item, $this->delimiter, $this->enclosure)) {
+                throw new RuntimeErrorException('Failed to write to file %path%', ['%path%' => $this->getPath()]);
+            } elseif ($this->stepExecution) {
+                $this->stepExecution->incrementSummaryInfo('write');
+            }
         }
     }
 
@@ -185,38 +173,7 @@ class CsvWriter extends FileWriter implements ArchivableWriterInterface
      */
     public function write(array $items)
     {
-        $products = [];
-
-        if (!is_dir(dirname($this->getPath()))) {
-            mkdir(dirname($this->getPath()), 0777, true);
-        }
-
-        foreach ($items as $item) {
-            $products[] = $item['product'];
-            foreach ($item['media'] as $media) {
-                if ($media) {
-                    $this->copyMedia($media);
-                }
-            }
-        }
-
-        $this->items = array_merge($this->items, $products);
-    }
-
-    /**
-     * @param AbstractMedia $media
-     *
-     * @return void
-     */
-    protected function copyMedia(AbstractMedia $media)
-    {
-        $result = $this->mediaManager->copy($media, dirname($this->getPath()));
-        $exportPath = $this->mediaManager->getExportPath($media);
-        if (true === $result) {
-            $this->writtenFiles[sprintf('%s/%s', dirname($this->getPath()), $exportPath)] = $exportPath;
-        } else {
-            $this->stepExecution->addWarning('CswWriter', 'Copy of ' . $media->getFilename() . ' failed.', [], $media);
-        }
+        $this->items = array_merge($this->items, $items);
     }
 
     /**

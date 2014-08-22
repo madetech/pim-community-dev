@@ -6,11 +6,12 @@ use Symfony\Component\Form\FormFactoryInterface;
 use Oro\Bundle\FilterBundle\Datasource\FilterDatasourceAdapterInterface;
 use Oro\Bundle\FilterBundle\Filter\BooleanFilter;
 use Oro\Bundle\FilterBundle\Form\Type\Filter\BooleanFilterType;
-use Oro\Bundle\DataGridBundle\Datagrid\RequestParameters;
 use Oro\Bundle\FilterBundle\Filter\FilterUtility;
+use Oro\Bundle\DataGridBundle\Datagrid\RequestParameters;
 use Pim\Bundle\CatalogBundle\Model\AbstractProduct;
 use Pim\Bundle\CatalogBundle\Entity\AssociationType;
 use Pim\Bundle\CatalogBundle\Entity\Repository\AssociationTypeRepository;
+use Pim\Bundle\DataGridBundle\Datagrid\RequestParametersExtractorInterface;
 
 /**
  * Product is associated filter (used by association product grid)
@@ -22,9 +23,9 @@ use Pim\Bundle\CatalogBundle\Entity\Repository\AssociationTypeRepository;
 class IsAssociatedFilter extends BooleanFilter
 {
     /**
-     * @var RequestParameters
+     * @var RequestParametersExtractorInterface
      */
-    protected $requestParams;
+    protected $extractor;
 
     /**
      * @var AssociationTypeRepository
@@ -34,20 +35,20 @@ class IsAssociatedFilter extends BooleanFilter
     /**
      * Constructor
      *
-     * @param FormFactoryInterface      $factory
-     * @param FilterUtility             $util
-     * @param RequestParameters         $requestParams
-     * @param AssociationTypeRepository $repo
+     * @param FormFactoryInterface                $factory
+     * @param FilterUtility                       $util
+     * @param RequestParametersExtractorInterface $extractor
+     * @param AssociationTypeRepository           $repo
      */
     public function __construct(
         FormFactoryInterface $factory,
         FilterUtility $util,
-        RequestParameters $requestParams,
+        RequestParametersExtractorInterface $extractor,
         AssociationTypeRepository $repo
     ) {
         parent::__construct($factory, $util);
-        $this->requestParams = $requestParams;
         $this->assocTypeRepository = $repo;
+        $this->extractor = $extractor;
     }
 
     /**
@@ -60,8 +61,8 @@ class IsAssociatedFilter extends BooleanFilter
             return false;
         }
 
-        $associationType = $this->getAssociationType($this->requestParams);
-        $product         = $this->getCurrentProduct($this->requestParams);
+        $associationType = $this->getAssociationType();
+        $product         = $this->getCurrentProduct();
         $productIds      = $this->getAssociatedProductIds($product, $associationType);
         $operator = ($data['value'] === BooleanFilterType::TYPE_YES) ? 'IN' : 'NOT IN';
 
@@ -74,15 +75,19 @@ class IsAssociatedFilter extends BooleanFilter
     }
 
     /**
-     * @param RequestParameters $params
-     *
      * @return AssociationType
      */
-    protected function getAssociationType(RequestParameters $params)
+    protected function getAssociationType()
     {
-        $associationTypeId = $this->requestParams->get('associationType', null);
+        $params = $this->extractor->getDatagridParameter(RequestParameters::ADDITIONAL_PARAMETERS, []);
+        $associationTypeId = isset($params['associationType']) ? $params['associationType'] : null;
+
         if (!$associationTypeId) {
-            throw new \LogicalException('The current association type must be configured');
+            $associationTypeId = $this->extractor->getDatagridParameter('associationType');
+        }
+
+        if (!$associationTypeId) {
+            throw new \LogicException('The current association type must be configured');
         }
 
         $associationType = $this->assocTypeRepository->findOneBy(['id' => $associationTypeId]);
@@ -91,15 +96,13 @@ class IsAssociatedFilter extends BooleanFilter
     }
 
     /**
-     * @param RequestParameters $params
-     *
      * @return AbstractProduct
      */
-    protected function getCurrentProduct(RequestParameters $params)
+    protected function getCurrentProduct()
     {
-        $productId = $this->requestParams->get('product', null);
+        $productId = $this->extractor->getDatagridParameter('product');
         if (!$productId) {
-            throw new \LogicalException('The current product type must be configured');
+            throw new \LogicException('The current product type must be configured');
         }
         $product = $this->util->getProductManager()->find($productId);
 
