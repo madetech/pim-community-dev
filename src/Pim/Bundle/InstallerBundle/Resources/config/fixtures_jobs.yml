@@ -122,7 +122,7 @@ jobs:
         type:      fixtures
         configuration:
             filePath: products.csv
-            delimiter: ;
+            delimiter: ","
             enclosure: '"'
             escape: '\'
             enabled: true
